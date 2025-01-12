@@ -285,6 +285,35 @@ def main(
         else:
             df = cumulative_df
 
+    # If args.dscf_turnover is set:
+    # In the pivoted and ready to plot dataframe, generate a new column from wB97M-V and wB97M-V_dSCF:
+    # In the new column, take all values from wB97M-V until the distance is smaller than args.dscf_turnover,
+    # then take all values from wB97M-V_dSCF.
+    # Call the new column wB97M-V_minimum.
+    if args.dscf_turnover:
+        # count how many CIDs are smaller than the turnover distance and how many are larger
+        smaller = 0
+        larger = 0
+        for cid in df["CID"]:
+            if cid < args.dscf_turnover:
+                smaller += 1
+            else:
+                larger += 1
+        df["wB97M-V_minimum"] = df["wB97M-V"]
+        counter = 0
+        for i, row in df.iterrows():
+            counter += 1
+            if row["CID"] > args.dscf_turnover:
+                df.at[i, "wB97M-V_minimum"] = row["wB97M-V_dSCF"]
+                # set dSCF values to NaN where they were copied to wB97M-V_minimum
+                # if counter > smaller + 1:
+                #     df.at[i, "wB97M-V_dSCF"] = np.nan
+            # same with the other way around
+            # if row["CID"] < args.dscf_turnover and counter < smaller:
+            #     df.at[i, "wB97M-V"] = np.nan
+        # insert the new method into the list of methods, but at the beginning
+        methods.insert(4, "wB97M-V_minimum")
+
     if VERBOSITY > 0:
         print(df)
         if VERBOSITY > 1:
@@ -309,6 +338,7 @@ def plot_charges(
     plt.rcParams["font.weight"] = "regular"
 
     for method in methods:
+        linestyle = "-"
         if method in ["EEQ", "EEQ_DIELECTRIC"]:
             color = "#fcba00"
             marker = "p"
@@ -337,12 +367,22 @@ def plot_charges(
             label = method
             if "_CPCM" in method:
                 label = r"GFN2-xTB$_\mathrm{CPCM}$"
+        elif method in ["wB97M-V_minimum"]:
+            color = "#909085"
+            marker = ""
+            label = "ωB97M-V"
         elif method in ["wB97M-V", "wB97M-V_CPCM"]:
             color = "#909085"
             marker = "<"
-            label = "ωB97M-V"
+            label = r"ωB97M-V$_\mathrm{heterolytic}$"
+            # linestyle = "--"
             if "_CPCM" in method:
                 label = r"ωB97M-V$_\mathrm{CPCM}$"
+        elif method in ["wB97M-V_dSCF"]:
+            color = "#909085"
+            marker = ">"
+            label = r"ωB97M-V$_\mathrm{homolytic}$"
+            linestyle = "--"
         else:
             raise ValueError(f"Unknown method: {method}")
 
@@ -356,8 +396,8 @@ def plot_charges(
             markeredgecolor="black",
             markeredgewidth=0.25,
             markersize=3,
-            linewidth=1,
-            linestyle="-",
+            linewidth=0.75,
+            linestyle=linestyle,
         )
         if add_part_data and method in ["EEQ", "EEQ_BC", "wB97M-V", "CEH-v2"]:
             sns.lineplot(
@@ -371,13 +411,13 @@ def plot_charges(
                 markeredgewidth=0.25,
                 markersize=2,
                 linewidth=0.75,
-                linestyle="--",
+                linestyle=":",
             )
 
     # set y axis limits from 0.05 to -1.05
-    plt.ylim(-1.05, 0.05)
+    plt.ylim(-1.05, 0.15)
     # include legend and put it above the plot
-    plt.legend(fontsize=8, loc="upper center", bbox_to_anchor=(0.5, 1.3), ncol=3)
+    plt.legend(fontsize=8, loc="upper center", bbox_to_anchor=(0.5, 1.4), ncol=4)
     # set y axis label
     plt.ylabel("atomic charge ($q$) on F / $e^{-}$", fontsize=8)
     # set x axis label
@@ -569,6 +609,13 @@ def get_args():
         action="store_true",
         default=False,
         help="Add the partitioned data to the plot.",
+    )
+    parser.add_argument(
+        "--dscf-turnover",
+        "-dt",
+        type=float,
+        default=None,
+        help="Distance at which the RKS to OS singlet turnover occurs.",
     )
 
     args = parser.parse_args()
