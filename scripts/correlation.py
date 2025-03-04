@@ -338,6 +338,8 @@ plt.xlabel(
 plt.ylabel("calc. atomic charge / a.u.", fontsize=8, color="black")
 plt.xticks(fontsize=8, color="black")
 plt.yticks(fontsize=8, color="black")
+plt.ylim(-1.0, 1.0)
+plt.xlim(-0.6, 0.6)
 
 # get current legend's handles and labels
 old_handles, old_labels = p.get_legend_handles_labels()
